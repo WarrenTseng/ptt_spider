@@ -1,4 +1,4 @@
-# Author: Chiu-Wang Tseng, 2017.8, lab301 BIME NTU
+# Author: Chiu-Wang Tseng, 2017.8, BIME NTU
 # Web Spider for PTT
 
 import requests as rs
@@ -9,23 +9,18 @@ import time
 class PTTSpider(object):
     def __init__(self, url):
         #url = 'http://www.ptt.cc/bbs/BlackDesert/index.html'
-        # main url 
-        # normalize the url as http
+        
         if url[:5] == 'https':
             url = 'http' + url[5:]
         self.url = url
         print('Resolving the url...')
-        # request the main url 
         res = rs.get(url)
-        # resolve the result by bs4
         self.soup = bs(res.text, 'lxml')
         print('Done')
         
     def _max_index(self, soup):
-        # return the max index of the pages under the main url
         s = soup.select('a')
         for a in s:
-            # find the max index by the href of '‹ 上頁' label
             if a.text == '‹ 上頁':
                 url_len_diff = len('http://www.ptt.cc'+a.attrs['href']) - len(self.url)
                 max_index = int(a.attrs['href'][-5-url_len_diff:-5])+1
@@ -33,7 +28,6 @@ class PTTSpider(object):
         return max_index
 
     def _extract_urls(self, max_index, target_index):
-        # extract all the url of the indexes
         urls = list()
         for i in range(max_index-target_index, max_index, 1):
             _url = self.url[:-5]+str(i+1)+'.html'
@@ -41,7 +35,6 @@ class PTTSpider(object):
         return urls
     
     def extract_content_pages(self, time_delay=1, proportion=1):
-        # extract all the content url from all the url of the indexes
         # time_delay: prevent the server aborting
         max_index = self._max_index(self.soup)
         if proportion>1 or proportion<0:
@@ -59,7 +52,6 @@ class PTTSpider(object):
                 i += 1
                 if i%10 == 0:
                     print('url', i, '...')
-                # resolving the url
                 res = rs.get(_url)
                 soup = bs(res.text, 'lxml')
                 s = soup.select('a')
@@ -76,7 +68,6 @@ class PTTSpider(object):
         return pages
     
     def _extract_content(self, pages):
-        # extract all the contents by the content urls
         # pages: url array
         htmls = list()
         i = 0
@@ -91,7 +82,6 @@ class PTTSpider(object):
         return htmls
     
     def extract_soup(self, pages):
-        # extract all the contents and resolve them by bs4
         htmls = self._extract_content(pages)
         soups = list()
         for html in htmls:
@@ -99,12 +89,54 @@ class PTTSpider(object):
             soups.append(soup)
         return soups
     
-    def show_titles(self, soups):
-        # extract the titles of the contents
+    def resolve_soup(self, soups):
+        articles = list()
         titles = list()
+        contents = list()
+        push_contents = list()
+        grades = list()
+        push_userids = list()
         for soup in soups:
+            article = dict()
             title = soup.select('title')
             title = title[0].text
+            article['titles'] = title
             titles.append(title)
-        return titles
-        
+            meta = soup.select('meta')
+            for content in meta:
+                for key, val in content.attrs.items():
+                    if key == 'name' and val == 'description':
+                        article['contents'] = content.attrs['content']
+                        contents.append(content.attrs['content'])
+            push = dict()
+            push['tag'] = list()
+            push['userid'] = list()
+            push['content'] = list()
+            push_content = list()
+            push_userid = list()
+            span = soup.select('span')
+            grade = 0
+            for s in span:
+                for key, vals in s.attrs.items():
+                    for val in vals:
+                        if val == 'push-tag':
+                            push['tag'].append(s.text)
+                            if s.text == '推 ':
+                                grade += 1
+                            elif s.text == '→ ':
+                                pass
+                            elif s.text == '噓 ':
+                                grade -= 1
+                        elif val == 'push-userid':
+                            push['userid'].append(s.text)
+                            push_userid.append(s.text)
+                        elif val == 'push-content':
+                            push['content'].append(s.text[2:])
+                            push_content.append(s.text[2:])
+            push_userids.append(push_userid)
+            push['grade'] = grade
+            grades.append(grade)
+            article['pushes'] = push
+            push_contents.append(push_content)
+            articles.append(article)
+        return articles, [titles, contents, push_contents, push_userids, grades]
