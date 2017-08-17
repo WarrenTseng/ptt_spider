@@ -1,6 +1,6 @@
 # ptt_spider
 Web spider for ptt <br>
-Author:  Warren Tseng,  2017.8,  BIME NTU
+Author:  Warren Tseng,  2017.8,  BIME NTU <br>
 e-mail: he01181603@gmail.com
 
 # requirement:
